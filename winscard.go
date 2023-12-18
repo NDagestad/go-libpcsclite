@@ -183,6 +183,19 @@ type ReaderState struct {
 	cardProtocol  uint32                            /* SCARD_PROTOCOL_* value */
 }
 
+func (reader ReaderState) GetAtrString() string {
+	atrStr := ""
+	var i uint32
+	for i = 0; i<reader.cardAtrLength; i++ {
+		atrStr = fmt.Sprintf("%s%02x ", atrStr, reader.cardAtr[i])
+	}
+	return atrStr
+}
+
+func (reader ReaderState) GetAtrBytes() []byte {
+	return reader.cardAtr[:reader.cardAtrLength]
+}
+
 func getReaderState(data []byte) (ReaderState, error) {
 	ret := ReaderState{}
 	if len(data) < ReaderStateDescriptorLength {
@@ -190,6 +203,16 @@ func getReaderState(data []byte) (ReaderState, error) {
 	}
 
 	ret.Name = string(data[:ReaderStateNameLength])
+	// FIXME, this is ugly
+	for i, b := range(ret.Name) {
+		if b == 0 {
+			if i == 0 {
+				break
+			}
+			ret.Name = ret.Name[:i]
+			break
+		}
+	}
 	ret.eventCounter = binary.LittleEndian.Uint32(data[unsafe.Offsetof(ret.eventCounter):])
 	ret.readerState = binary.LittleEndian.Uint32(data[unsafe.Offsetof(ret.readerState):])
 	ret.readerSharing = binary.LittleEndian.Uint32(data[unsafe.Offsetof(ret.readerSharing):])
@@ -201,7 +224,7 @@ func getReaderState(data []byte) (ReaderState, error) {
 }
 
 // ListReaders gets the list of readers from the daemon
-func (client *Client) ListReaders() ([]string, error) {
+func (client *Client) ListReaders() ([]ReaderState, error) {
 	client.mutex.Lock()
 	defer client.mutex.Unlock()
 
@@ -219,8 +242,9 @@ func (client *Client) ListReaders() ([]string, error) {
 		total += n
 	}
 
-	var names []string
+	max := 0
 	for i := range client.readerStateDescriptors {
+		max=i
 		desc, err := getReaderState(response[i*ReaderStateDescriptorLength:])
 		if err != nil {
 			return nil, err
@@ -229,10 +253,10 @@ func (client *Client) ListReaders() ([]string, error) {
 		if desc.Name[0] == 0 {
 			break
 		}
-		names = append(names, desc.Name)
 	}
 
-	return names, nil
+
+	return client.readerStateDescriptors[:max], nil
 }
 
 // Offsets into the Connect request/response packet

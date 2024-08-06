@@ -70,7 +70,7 @@ func EstablishContext(path string, scope uint32) (*Client, error) {
 
 	var code uint32
 	var minor uint32
-	for minor = ProtocolVersionMinor; minor <= ProtocolVersionMinor+1; minor++ {
+	for minor = ProtocolVersionMinor; minor <= ProtocolVersionMinor+2; minor++ {
 		/* Exchange version information */
 		binary.LittleEndian.PutUint32(payload, ProtocolVersionMajor)
 		binary.LittleEndian.PutUint32(payload[4:], minor)
